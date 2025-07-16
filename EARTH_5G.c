@@ -32,7 +32,7 @@ int main() {
         .Pout_max = 39.5
     };
 
-    FILE *data = fopen("bs_power_watts.dat", "w");
+    FILE *data = fopen("data.dat", "w");
     if (!data) return 1;
 
     for (double x = 0.0; x <= 1.001; x += 0.05) {
@@ -49,7 +49,7 @@ int main() {
     fprintf(gp, "set xlabel 'RF Output Power (%% of Max)'\n");
     fprintf(gp, "set ylabel 'BS Power Consumption (W)'\n");
     fprintf(gp, "set grid\n");
-    fprintf(gp, "plot 'bs_power_watts.dat' using 1:2 with linespoints title 'Macrocell BS'\n");
+    fprintf(gp, "plot 'data.dat' using 1:2 with linespoints title 'Macrocell BS'\n");
 
     pclose(gp);
     return 0;
