@@ -1,57 +1,109 @@
 #include <stdio.h>
+#include <math.h>
 
 typedef struct {
-    int Ntrx;           // Number of transceivers
-    int Npa;            // Number of power amplifiers
-    double Prf;         // RF power (W)
-    double Pbb;         // Baseband power (W)
-    double sigma_feed;  // Feeder loss
-    double sigma_dc;    // DC-DC loss
-    double sigma_ms;    // Main supply loss
-    double sigma_cool;  // Cooling loss
-    double Pout_max;    // Max RF output (W)
+    int Ntrx;          // Total number of TRX chains (antennas)
+    double Prf;        // RF transceiver power per chain (W)
+    double Pbb;        // Baseband power per chain (W)
+    double sigma_dc;   // DC-DC loss factor (0-1)
+    double sigma_ms;   // Main supply loss factor (0-1)
+    double eta_pa;     // PA efficiency (0-1)
+    double Pout_max;   // Max output power per antenna (W)
+    double Psleep;     // Sleep mode power (W)
 } BS_PowerModel;
 
-// EARTH BS power consumption
-double compute_Pin(double Pout, BS_PowerModel bs) {
-    double numerator = (Pout / (bs.Npa * (1.0 - bs.sigma_feed))) + bs.Prf + bs.Pbb;
-    double efficiency = (1.0 - bs.sigma_dc) * (1.0 - bs.sigma_ms) * (1.0 - bs.sigma_cool);
-    return bs.Ntrx * (numerator / efficiency);
+// Compute component breakdown
+void compute_components(double Pout, BS_PowerModel bs, 
+                        double *PA, double *RF, double *BB, 
+                        double *DC, double *MS, double *CO) {
+    // Zero out components if in sleep mode
+    if (Pout == 0.0) {
+        *PA = *RF = *BB = *DC = *MS = *CO = 0.0;
+        return;
+    }
+    
+    // PA component
+    *PA = bs.Ntrx * (Pout / bs.eta_pa);
+    
+    // RF component
+    *RF = bs.Ntrx * bs.Prf;
+    
+    // BB component
+    *BB = bs.Ntrx * bs.Pbb;
+    
+    // Total power before losses
+    double total_active = *PA + *RF + *BB;
+    
+    // Compute losses
+    *DC = total_active * bs.sigma_dc / (1 - bs.sigma_dc);
+    double after_dc = total_active + *DC;
+    
+    *MS = after_dc * bs.sigma_ms / (1 - bs.sigma_ms);
+    double after_ms = after_dc + *MS;
+    
+    // Cooling only applies at system level
+    *CO = 0;  // RRH has no active cooling
 }
 
 int main() {
+    // Macro BS parameters for RRH configuration (matches EARTH model)
     BS_PowerModel macro = {
-        .Ntrx = 3,
-        .Npa = 2,
-        .Prf = 13.0,
-        .Pbb = 29.5,
-        .sigma_feed = 0.1,
-        .sigma_dc = 0.075,
-        .sigma_ms = 0.09,
-        .sigma_cool = 0.1,
-        .Pout_max = 39.5
+        .Ntrx = 5,         // 6 TRX chains (2 antennas/sector × 3 sectors)
+        .Prf = 8.0,        // RF transceiver power per chain
+        .Pbb = 8.0,        // Baseband power per chain
+        .sigma_dc = 0.075, // 7.5% DC-DC loss
+        .sigma_ms = 0.09,  // 9% main supply loss
+        .eta_pa = 0.38,    // PA efficiency
+        .Pout_max = 20.0,  // Max output power per antenna (W)
+        .Psleep = 75.0     // Sleep mode power
     };
 
-    FILE *data = fopen("data.dat", "w");
+    const int N = 21;  // 0% to 100% in 5% steps
+    FILE *data = fopen("components.dat", "w");
     if (!data) return 1;
-
-    for (double x = 0.0; x <= 1.001; x += 0.05) {
-        double Pout = x * macro.Pout_max;
-        double Pin = compute_Pin(Pout, macro);
-        fprintf(data, "%f %f\n", x * 100.0, Pin); // X: RF % | Y: Power in Watts
+    
+    // Write header for stacked area plot
+    fprintf(data, "Load_Percent PA RF BB DC MS CO Sleep\n");
+    
+    for (int i = 0; i < N; i++) {
+        double load_percent = i * 5.0;  // 0%, 5%, ..., 100%
+        double load_factor = load_percent / 100.0;
+        double Pout = (load_percent == 0.0) ? 0.0 : load_factor * macro.Pout_max;
+        
+        // Compute components
+        double PA, RF, BB, DC, MS, CO;
+        compute_components(Pout, macro, &PA, &RF, &BB, &DC, &MS, &CO);
+        
+        double sleep_power = (load_percent == 0.0) ? macro.Psleep : 0.0;
+        
+        // Write components in stacking order
+        fprintf(data, "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", 
+                load_percent, PA, RF, BB, DC, MS, CO, sleep_power);
     }
     fclose(data);
 
+    // Generate area plot
     FILE *gp = popen("gnuplot -persistent", "w");
     if (!gp) return 1;
 
-    fprintf(gp, "set title 'MACRO'\n");
+    fprintf(gp, "set title 'Macrocell BS Power Component Breakdown (RRH Configuration)'\n");
     fprintf(gp, "set xlabel 'RF Output Power (%% of Max)'\n");
-    fprintf(gp, "set ylabel 'BS Power Consumption (W)'\n");
+    fprintf(gp, "set ylabel 'Power Consumption (W)'\n");
     fprintf(gp, "set grid\n");
-    fprintf(gp, "plot 'data.dat' using 1:2 with linespoints title 'Macrocell BS'\n");
-
+    fprintf(gp, "set key outside right top vertical\n");
+    fprintf(gp, "set xrange [0:100]\n");
+    fprintf(gp, "set yrange [0:700]\n");
+    fprintf(gp, "set style fill transparent solid 0.7\n\n");
+    
+    fprintf(gp, "plot 'components.dat' using 1:2 with filledcurves x1 title 'PA (Power Amplifier)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3) with filledcurves x1 title 'RF (RF Transceiver)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4) with filledcurves x1 title 'BB (Baseband)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5) with filledcurves x1 title 'DC (DC-DC Converters)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6) with filledcurves x1 title 'PS (AC/DC Power Supply)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7) with filledcurves x1 title 'CO (Cooling)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7+$8) with filledcurves x1 title 'Sleep Mode', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7+$8) with lines lw 2 lc rgb 'black' notitle\n");
+    
     pclose(gp);
     return 0;
 }
-

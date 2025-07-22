@@ -1,0 +1,17 @@
+=== Calibrated Bottom-Up Model ===
+Pin = Ntrx * [ Pout/((1-σ_feed)*η_pa) + Prf + Pbb ] / [ (1-σ_dc)*(1-σ_ms)*(1-σ_cool) ]
+Adjusted Parameters:
+  Prf = 8.0 W (per chain)
+  Pbb = 8.0 W (per chain)
+  σ_feed = 0.000 (RRH configuration)
+  η_pa = 0.380 (improved efficiency)
+  σ_cool = 0.000 (no active cooling)
+
+=== Linear Approximation ===
+Pin(x) ≈ 3.7516 * x + 114.0481   (x > 0%)
+Pin(0%) = 75.0 (sleep mode)
+
+=== EARTH Reference Model (Table 8) ===
+Pin(x) = 130.0 + 4.7 * x   (x > 0%)
+Pin(0%) = 75.0 (sleep mode)
+Where x is RF Output Power [%]
