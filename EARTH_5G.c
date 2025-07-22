@@ -89,7 +89,7 @@ int main() {
     FILE *gp = popen("gnuplot -persistent", "w");
     if (!gp) return 1;
 
-    fprintf(gp, "set title 'Macrocell BS Power Component Breakdown (RRH Configuration)'\n");
+    fprintf(gp, "set title 'Macrocell BS Power'\n");
     fprintf(gp, "set xlabel 'RF Output Power (%% of Max)'\n");
     fprintf(gp, "set ylabel 'Power Consumption (W)'\n");
     fprintf(gp, "set grid\n");
@@ -109,15 +109,17 @@ int main() {
     fprintf(gp, "set style line 8 lc rgb '#000000'  # Total - Black\n\n");
     
     fprintf(gp, "# Plot stacked components with correct boundaries\n");
-    fprintf(gp, "plot 'components.dat' using 1:2 with filledcurves title 'Sleep Mode' ls 1, \\\n");
-    fprintf(gp, "     '' using 1:($2):($2+$3) with filledcurves title 'PA (Power Amplifier)' ls 2, \\\n");
-    fprintf(gp, "     '' using 1:($2+$3):($2+$3+$4) with filledcurves title 'RF (RF Transceiver)' ls 3, \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4):($2+$3+$4+$5) with filledcurves title 'BB (Baseband)' ls 4, \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5):($2+$3+$4+$5+$6) with filledcurves title 'DC (DC-DC Converters)' ls 5, \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6):($2+$3+$4+$5+$6+$7) with filledcurves title 'PS (AC/DC Power Supply)' ls 6, \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7):($2+$3+$4+$5+$6+$7+$8) with filledcurves title 'CO (Cooling)' ls 7, \\\n");
-    fprintf(gp, "     '' using 1:9 with lines ls 8 lw 2 title 'Total Power'\n");
     
+    fprintf(gp,
+    "plot 'components.dat' using 1:($2==0 ? 0 : 1/0):(0) with filledcurves y1 title 'Sleep Mode' ls 1, \\\n"
+    "     '' using 1:($2):($2+$3) with filledcurves title 'PA (Power Amplifier)' ls 2, \\\n"
+    "     '' using 1:($2+$3):($2+$3+$4) with filledcurves title 'RF (RF Transceiver)' ls 3, \\\n"
+    "     '' using 1:($2+$3+$4):($2+$3+$4+$5) with filledcurves title 'BB (Baseband)' ls 4, \\\n"
+    "     '' using 1:($2+$3+$4+$5):($2+$3+$4+$5+$6) with filledcurves title 'DC (DC-DC Converters)' ls 5, \\\n"
+    "     '' using 1:($2+$3+$4+$5+$6):($2+$3+$4+$5+$6+$7) with filledcurves title 'PS (AC/DC Power Supply)' ls 6, \\\n"
+    "     '' using 1:($2+$3+$4+$5+$6+$7):($2+$3+$4+$5+$6+$7+$8) with filledcurves title 'CO (Cooling)' ls 7, \\\n"
+    "     '' using 1:9 with lines ls 8 lw 2 title 'Total Power'\n");
+
     pclose(gp);
     return 0;
 }
