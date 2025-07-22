@@ -39,7 +39,6 @@ void compute_components(double Pout, BS_PowerModel bs,
     double after_dc = total_active + *DC;
     
     *MS = after_dc * bs.sigma_ms / (1 - bs.sigma_ms);
-    double after_ms = after_dc + *MS;
     
     // Cooling only applies at system level
     *CO = 0;  // RRH has no active cooling
@@ -48,7 +47,7 @@ void compute_components(double Pout, BS_PowerModel bs,
 int main() {
     // Macro BS parameters for RRH configuration (matches EARTH model)
     BS_PowerModel macro = {
-        .Ntrx = 5,         // 6 TRX chains (2 antennas/sector × 3 sectors)
+        .Ntrx = 6,         // 6 TRX chains (2 antennas/sector × 3 sectors)
         .Prf = 8.0,        // RF transceiver power per chain
         .Pbb = 8.0,        // Baseband power per chain
         .sigma_dc = 0.075, // 7.5% DC-DC loss
@@ -63,7 +62,7 @@ int main() {
     if (!data) return 1;
     
     // Write header for stacked area plot
-    fprintf(data, "Load_Percent PA RF BB DC MS CO Sleep\n");
+    fprintf(data, "Load_Percent Sleep PA RF BB DC PS CO Total\n");
     
     for (int i = 0; i < N; i++) {
         double load_percent = i * 5.0;  // 0%, 5%, ..., 100%
@@ -75,10 +74,11 @@ int main() {
         compute_components(Pout, macro, &PA, &RF, &BB, &DC, &MS, &CO);
         
         double sleep_power = (load_percent == 0.0) ? macro.Psleep : 0.0;
+        double total_power = sleep_power + PA + RF + BB + DC + MS + CO;
         
         // Write components in stacking order
-        fprintf(data, "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", 
-                load_percent, PA, RF, BB, DC, MS, CO, sleep_power);
+        fprintf(data, "%.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f %.1f\n", 
+                load_percent, sleep_power, PA, RF, BB, DC, MS, CO, total_power);
     }
     fclose(data);
 
@@ -95,14 +95,23 @@ int main() {
     fprintf(gp, "set yrange [0:700]\n");
     fprintf(gp, "set style fill transparent solid 0.7\n\n");
     
-    fprintf(gp, "plot 'components.dat' using 1:2 with filledcurves x1 title 'PA (Power Amplifier)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3) with filledcurves x1 title 'RF (RF Transceiver)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4) with filledcurves x1 title 'BB (Baseband)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5) with filledcurves x1 title 'DC (DC-DC Converters)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6) with filledcurves x1 title 'PS (AC/DC Power Supply)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7) with filledcurves x1 title 'CO (Cooling)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7+$8) with filledcurves x1 title 'Sleep Mode', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7+$8) with lines lw 2 lc rgb 'black' notitle\n");
+    fprintf(gp, "# Define custom colors\n");
+    fprintf(gp, "set linetype 1 lc rgb 'gray'     # Sleep\n");
+    fprintf(gp, "set linetype 2 lc rgb 'red'      # PA\n");
+    fprintf(gp, "set linetype 3 lc rgb 'blue'     # RF\n");
+    fprintf(gp, "set linetype 4 lc rgb 'green'    # BB\n");
+    fprintf(gp, "set linetype 5 lc rgb 'purple'   # DC\n");
+    fprintf(gp, "set linetype 6 lc rgb 'orange'   # PS\n");
+    fprintf(gp, "set linetype 7 lc rgb 'brown'    # CO\n\n");
+    
+    fprintf(gp, "plot 'components.dat' using 1:2 with filledcurves x1 linetype 1 title 'Sleep Mode', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3) with filledcurves x1 linetype 2 title 'PA (Power Amplifier)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4) with filledcurves x1 linetype 3 title 'RF (RF Transceiver)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5) with filledcurves x1 linetype 4 title 'BB (Baseband)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6) with filledcurves x1 linetype 5 title 'DC (DC-DC Converters)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7) with filledcurves x1 linetype 6 title 'PS (AC/DC Power Supply)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7+$8) with filledcurves x1 linetype 7 title 'CO (Cooling)', \\\n");
+    fprintf(gp, "     '' using 1:9 with lines lw 2 lc rgb 'black' title 'Total Power'\n");
     
     pclose(gp);
     return 0;
