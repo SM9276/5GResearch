@@ -82,7 +82,7 @@ int main() {
     }
     fclose(data);
 
-    // Generate area plot
+    // Generate properly stacked area plot
     FILE *gp = popen("gnuplot -persistent", "w");
     if (!gp) return 1;
 
@@ -96,22 +96,24 @@ int main() {
     fprintf(gp, "set style fill transparent solid 0.7\n\n");
     
     fprintf(gp, "# Define custom colors\n");
-    fprintf(gp, "set linetype 1 lc rgb 'gray'     # Sleep\n");
-    fprintf(gp, "set linetype 2 lc rgb 'red'      # PA\n");
-    fprintf(gp, "set linetype 3 lc rgb 'blue'     # RF\n");
-    fprintf(gp, "set linetype 4 lc rgb 'green'    # BB\n");
-    fprintf(gp, "set linetype 5 lc rgb 'purple'   # DC\n");
-    fprintf(gp, "set linetype 6 lc rgb 'orange'   # PS\n");
-    fprintf(gp, "set linetype 7 lc rgb 'brown'    # CO\n\n");
+    fprintf(gp, "set style line 1 lc rgb '#888888'  # Sleep - Gray\n");
+    fprintf(gp, "set style line 2 lc rgb '#FF0000'  # PA - Red\n");
+    fprintf(gp, "set style line 3 lc rgb '#0000FF'  # RF - Blue\n");
+    fprintf(gp, "set style line 4 lc rgb '#00AA00'  # BB - Green\n");
+    fprintf(gp, "set style line 5 lc rgb '#AA00FF'  # DC - Purple\n");
+    fprintf(gp, "set style line 6 lc rgb '#FF8800'  # PS - Orange\n");
+    fprintf(gp, "set style line 7 lc rgb '#AA5500'  # CO - Brown\n");
+    fprintf(gp, "set style line 8 lc rgb '#000000'  # Total - Black\n\n");
     
-    fprintf(gp, "plot 'components.dat' using 1:2 with filledcurves x1 linetype 1 title 'Sleep Mode', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3) with filledcurves x1 linetype 2 title 'PA (Power Amplifier)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4) with filledcurves x1 linetype 3 title 'RF (RF Transceiver)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5) with filledcurves x1 linetype 4 title 'BB (Baseband)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6) with filledcurves x1 linetype 5 title 'DC (DC-DC Converters)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7) with filledcurves x1 linetype 6 title 'PS (AC/DC Power Supply)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7+$8) with filledcurves x1 linetype 7 title 'CO (Cooling)', \\\n");
-    fprintf(gp, "     '' using 1:9 with lines lw 2 lc rgb 'black' title 'Total Power'\n");
+    fprintf(gp, "# Plot stacked components\n");
+    fprintf(gp, "plot 'components.dat' using 1:2 with filledcurves ls 1 title 'Sleep Mode', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3) with filledcurves ls 2 title 'PA (Power Amplifier)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4) with filledcurves ls 3 title 'RF (RF Transceiver)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5) with filledcurves ls 4 title 'BB (Baseband)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6) with filledcurves ls 5 title 'DC (DC-DC Converters)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7) with filledcurves ls 6 title 'PS (AC/DC Power Supply)', \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7+$8) with filledcurves ls 7 title 'CO (Cooling)', \\\n");
+    fprintf(gp, "     '' using 1:9 with lines ls 8 lw 2 title 'Total Power'\n");
     
     pclose(gp);
     return 0;
