@@ -12,7 +12,7 @@ typedef struct {
     double Psleep;     // Sleep mode power (W)
 } BS_PowerModel;
 
-// Compute component breakdown
+// Compute component breakdown with correct relationships
 void compute_components(double Pout, BS_PowerModel bs, 
                         double *PA, double *RF, double *BB, 
                         double *DC, double *MS, double *CO) {
@@ -22,26 +22,29 @@ void compute_components(double Pout, BS_PowerModel bs,
         return;
     }
     
-    // PA component
+    // PA component (DC input power to PA)
     *PA = bs.Ntrx * (Pout / bs.eta_pa);
     
-    // RF component
+    // RF transceiver power (fixed)
     *RF = bs.Ntrx * bs.Prf;
     
-    // BB component
+    // Baseband power (fixed)
     *BB = bs.Ntrx * bs.Pbb;
     
-    // Total power before losses
+    // Total active power (PA + RF + BB)
     double total_active = *PA + *RF + *BB;
     
-    // Compute losses
-    *DC = total_active * bs.sigma_dc / (1 - bs.sigma_dc);
+    // DC-DC converter loss (proportional to active power)
+    *DC = total_active * bs.sigma_dc;
+    
+    // Power after DC-DC conversion
     double after_dc = total_active + *DC;
     
-    *MS = after_dc * bs.sigma_ms / (1 - bs.sigma_ms);
+    // Main supply loss (proportional to DC-DC output)
+    *MS = after_dc * bs.sigma_ms;
     
-    // Cooling only applies at system level
-    *CO = 0;  // RRH has no active cooling
+    // Cooling is zero for RRH configuration
+    *CO = 0.0;
 }
 
 int main() {
@@ -62,7 +65,7 @@ int main() {
     if (!data) return 1;
     
     // Write header for stacked area plot
-    fprintf(data, "Load_Percent Sleep PA RF BB DC PS CO Total\n");
+    fprintf(data, "Load_Percent Sleep PA RF BB DC MS CO Total\n");
     
     for (int i = 0; i < N; i++) {
         double load_percent = i * 5.0;  // 0%, 5%, ..., 100%
@@ -101,18 +104,18 @@ int main() {
     fprintf(gp, "set style line 3 lc rgb '#0000FF'  # RF - Blue\n");
     fprintf(gp, "set style line 4 lc rgb '#00AA00'  # BB - Green\n");
     fprintf(gp, "set style line 5 lc rgb '#AA00FF'  # DC - Purple\n");
-    fprintf(gp, "set style line 6 lc rgb '#FF8800'  # PS - Orange\n");
+    fprintf(gp, "set style line 6 lc rgb '#FF8800'  # PS (AC/DC) - Orange\n");
     fprintf(gp, "set style line 7 lc rgb '#AA5500'  # CO - Brown\n");
     fprintf(gp, "set style line 8 lc rgb '#000000'  # Total - Black\n\n");
     
-    fprintf(gp, "# Plot stacked components\n");
-    fprintf(gp, "plot 'components.dat' using 1:2 with filledcurves ls 1 title 'Sleep Mode', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3) with filledcurves ls 2 title 'PA (Power Amplifier)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4) with filledcurves ls 3 title 'RF (RF Transceiver)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5) with filledcurves ls 4 title 'BB (Baseband)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6) with filledcurves ls 5 title 'DC (DC-DC Converters)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7) with filledcurves ls 6 title 'PS (AC/DC Power Supply)', \\\n");
-    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7+$8) with filledcurves ls 7 title 'CO (Cooling)', \\\n");
+    fprintf(gp, "# Plot stacked components with correct boundaries\n");
+    fprintf(gp, "plot 'components.dat' using 1:2 with filledcurves title 'Sleep Mode' ls 1, \\\n");
+    fprintf(gp, "     '' using 1:($2):($2+$3) with filledcurves title 'PA (Power Amplifier)' ls 2, \\\n");
+    fprintf(gp, "     '' using 1:($2+$3):($2+$3+$4) with filledcurves title 'RF (RF Transceiver)' ls 3, \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4):($2+$3+$4+$5) with filledcurves title 'BB (Baseband)' ls 4, \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5):($2+$3+$4+$5+$6) with filledcurves title 'DC (DC-DC Converters)' ls 5, \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6):($2+$3+$4+$5+$6+$7) with filledcurves title 'PS (AC/DC Power Supply)' ls 6, \\\n");
+    fprintf(gp, "     '' using 1:($2+$3+$4+$5+$6+$7):($2+$3+$4+$5+$6+$7+$8) with filledcurves title 'CO (Cooling)' ls 7, \\\n");
     fprintf(gp, "     '' using 1:9 with lines ls 8 lw 2 title 'Total Power'\n");
     
     pclose(gp);
